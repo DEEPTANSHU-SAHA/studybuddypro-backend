@@ -21,27 +21,27 @@ const db = admin.database();
 app.post("/generate-quiz", async (req, res) => {
   const { topic } = req.body;
 
-  const prompt = `Generate 5 multiple choice questions (MCQs) for the topic "${topic}". Format as JSON:
-[{"question":"...","options":["opt1","opt2","opt3","opt4"],"correctAnswerIndex":0}]`;
+  const prompt = `Generate 5 multiple choice questions on ${topic}. Return only a JSON array like:
+[{"question":"...","options":["A","B","C","D"],"correctAnswerIndex":0}]`;
 
   try {
-    const hfResponse = await axios.post(
-      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
-      { inputs: prompt },
+    const resp = await axios.post(
+      "https://api.cohere.com/v1/chat",
+      { message: prompt },
       {
         headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_TOKEN}`,
-          "Content-Type": "application/json",
-        },
+          Authorization: `Bearer ${process.env.COHERE_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
     );
 
-    // ✅ Get the raw text
-    const rawText = hfResponse.data[0]?.generated_text || "";
-    console.log("Raw response:", rawText);
 
+    // ✅ Get the raw text
+   const generatedText = resp.data.text.trim();
     // ✅ Parse the JSON part
-    const questions = extractJson(rawText); // Helper function below
+    const questions = JSON.parse(generatedText);
+    res.status(200).json({ success: true, questions })
 
     if (!questions) {
       return res.status(500).json({ error: "Failed to parse questions" });
@@ -53,10 +53,10 @@ app.post("/generate-quiz", async (req, res) => {
 
     res.status(200).json({ success: true, questions }); // <- matches your app's format
   } catch (error) {
-    console.error("Error generating quiz:", error.message);
+    console.error(error.message);
     res.status(500).json({ error: error.message });
   }
-});
+})
 
 // ✅ Helper: extract JSON array from raw response
 function extractJson(text) {
